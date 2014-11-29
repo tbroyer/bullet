@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Generated;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
@@ -114,6 +115,7 @@ public class ComponentProcessor extends AbstractProcessor {
       try (PrintWriter writer = new PrintWriter(javaFileObject.openWriter())) {
         writer.printf( "package %s;\n", packageName);
         writer.println();
+        writer.printf("@%s(\"%s\")\n", Generated.class.getCanonicalName(), ComponentProcessor.class.getCanonicalName());
         writer.printf("public final class %s implements %s {\n", name, ObjectGraph.class.getCanonicalName());
         writer.printf("  private final %s component;\n", element.getQualifiedName().toString());
         writer.println();
