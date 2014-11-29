@@ -125,16 +125,13 @@ public class ComponentProcessor extends AbstractProcessor {
         writer.println();
         writer.println("  @Override");
         writer.println("  public <T> T get(Class<T> type) {");
-        writer.print(  "    ");
         for (ExecutableElement method : methods) {
-          writer.printf("if (type == %s.class) {\n", MoreElements.asType(processingEnv.getTypeUtils().asElement(method.getReturnType())).getQualifiedName().toString());
+          writer.printf("    if (type == %s.class) {\n", MoreElements.asType(processingEnv.getTypeUtils().asElement(method.getReturnType())).getQualifiedName().toString());
           writer.printf("      return type.cast(this.component.%s());\n", method.getSimpleName());
-          writer.print("    } else ");
+          writer.println("    }");
         }
-        writer.println("{");
         // TODO: exception message
-        writer.println("      throw new IllegalArgumentException();");
-        writer.println("    }");
+        writer.println("    throw new IllegalArgumentException();");
         writer.println("  }");
         writer.println();
         writer.println("  @Override");
