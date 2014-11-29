@@ -18,6 +18,7 @@ package bullet.impl;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -32,17 +33,18 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
-import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 
 import com.google.auto.common.MoreElements;
+import com.google.auto.common.MoreTypes;
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 
 import bullet.ObjectGraph;
@@ -76,35 +78,32 @@ public class ComponentProcessor extends AbstractProcessor {
   }
 
   private void generateObjectGraph(TypeElement element) {
-    List<ExecutableElement> methods = ElementFilter
-        .methodsIn(processingEnv.getElementUtils().getAllMembers(element));
-    Iterables.removeIf(methods, new Predicate<ExecutableElement>() {
-      @Override
-      public boolean apply(ExecutableElement executableElement) {
-        return !isComponentProvisionMethod(executableElement);
+    ArrayList<ExecutableElement> provisionMethods = new ArrayList<>();
+    ArrayList<ExecutableElement> membersInjectionMethods = new ArrayList<>();
+    for (ExecutableElement method : ElementFilter.methodsIn(processingEnv.getElementUtils().getAllMembers(element))) {
+      if (isComponentProvisionMethod(method)) {
+        provisionMethods.add(method);
+      } else if (isComponentMembersInjectionMethod(method)) {
+        membersInjectionMethods.add(method);
       }
+    }
+    // Order members-injection methods from most-specific to least-specific types, for cascading ifs of instanceof.
+    Collections.sort(membersInjectionMethods, new Comparator<ExecutableElement>() {
+      final Types typeUtils = processingEnv.getTypeUtils();
 
-      boolean isComponentProvisionMethod(ExecutableElement method) {
-        return method.getParameters().isEmpty()
-            && !method.getReturnType().getKind().equals(TypeKind.VOID)
-            && !processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName())
-                .equals(method.getEnclosingElement());
-      }
-    });
-    Collections.sort(methods, new Comparator<ExecutableElement>() {
       @Override
       public int compare(ExecutableElement o1, ExecutableElement o2) {
-        TypeMirror r1 = o1.getReturnType(), r2 = o2.getReturnType();
-        if (processingEnv.getTypeUtils().isSubtype(r1, r2)) {
+        TypeMirror p1 = Iterables.getOnlyElement(o1.getParameters()).asType(), p2 = Iterables.getOnlyElement(o2.getParameters()).asType();
+        if (typeUtils.isSubtype(p1, p2)) {
           return -1;
-        } else if (processingEnv.getTypeUtils().isSubtype(r2, r1)) {
-          return -1;
+        } else if (typeUtils.isSubtype(p2, p1)) {
+          return 1;
         }
-        return getName(r1).compareTo(getName(r2));
+        return getName(p1).compareTo(getName(p2));
       }
 
       private String getName(TypeMirror type) {
-        return MoreElements.asType(processingEnv.getTypeUtils().asElement(type)).getQualifiedName().toString();
+        return MoreElements.asType(typeUtils.asElement(type)).getQualifiedName().toString();
       }
     });
 
@@ -113,7 +112,7 @@ public class ComponentProcessor extends AbstractProcessor {
       final String packageName = processingEnv.getElementUtils().getPackageOf(element).getQualifiedName().toString();
       JavaFileObject javaFileObject = processingEnv.getFiler().createSourceFile(name, element);
       try (PrintWriter writer = new PrintWriter(javaFileObject.openWriter())) {
-        writer.printf( "package %s;\n", packageName);
+        writer.printf("package %s;\n", packageName);
         writer.println();
         writer.printf("@%s(\"%s\")\n", Generated.class.getCanonicalName(), ComponentProcessor.class.getCanonicalName());
         writer.printf("public final class %s implements %s {\n", name, ObjectGraph.class.getCanonicalName());
@@ -125,7 +124,7 @@ public class ComponentProcessor extends AbstractProcessor {
         writer.println();
         writer.println("  @Override");
         writer.println("  public <T> T get(Class<T> type) {");
-        for (ExecutableElement method : methods) {
+        for (ExecutableElement method : provisionMethods) {
           writer.printf("    if (type == %s.class) {\n", MoreElements.asType(processingEnv.getTypeUtils().asElement(method.getReturnType())).getQualifiedName().toString());
           writer.printf("      return type.cast(this.component.%s());\n", method.getSimpleName());
           writer.println("    }");
@@ -136,7 +135,15 @@ public class ComponentProcessor extends AbstractProcessor {
         writer.println();
         writer.println("  @Override");
         writer.println("  public <T> T inject(T instance) {");
-        writer.println("    throw new UnsupportedOperationException();");
+        for (ExecutableElement method : membersInjectionMethods) {
+          String typeName = MoreElements.asType(processingEnv.getTypeUtils().asElement(Iterables.getOnlyElement(method.getParameters()).asType())).getQualifiedName().toString();
+          writer.printf("    if (instance instanceof %s) {\n", typeName);
+          writer.printf("      this.component.%s((%s) instance);\n", method.getSimpleName(), typeName);
+          writer.println("      return instance;");
+          writer.println("    }");
+        }
+        // TODO: exception message
+        writer.println("    throw new IllegalArgumentException();");
         writer.println("  }");
         writer.println("}");
       }
@@ -161,10 +168,22 @@ public class ComponentProcessor extends AbstractProcessor {
 
   // This method has been copied from Dagger 2
   // Copyright (C) 2014 Google, Inc.
-  static boolean isComponentProvisionMethod(Elements elements, ExecutableElement method) {
+  private boolean isComponentProvisionMethod(ExecutableElement method) {
     return method.getParameters().isEmpty()
         && !method.getReturnType().getKind().equals(TypeKind.VOID)
-        && !elements.getTypeElement(Object.class.getCanonicalName())
-        .equals(method.getEnclosingElement());
+        && !processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName())
+            .equals(method.getEnclosingElement());
+  }
+
+  // This method has been copied from Dagger 2
+  // Copyright (C) 2014 Google, Inc.
+  private boolean isComponentMembersInjectionMethod(ExecutableElement method) {
+    List<? extends VariableElement> parameters = method.getParameters();
+    TypeMirror returnType = method.getReturnType();
+    return parameters.size() == 1
+        && (returnType.getKind().equals(TypeKind.VOID)
+            || MoreTypes.equivalence().equivalent(returnType, parameters.get(0).asType()))
+        && !processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName())
+            .equals(method.getEnclosingElement());
   }
 }

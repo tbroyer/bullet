@@ -64,7 +64,7 @@ public class ComponentProcessorTest {
         "",
         "  @Override",
         "  public <T> T inject(T instance) {",
-        "    throw new UnsupportedOperationException();",
+        "    throw new IllegalArgumentException();",
         "  }",
         "}");
     assert_().about(javaSources()).that(ImmutableList.of(injectableTypeFile, componentFile))
@@ -73,50 +73,187 @@ public class ComponentProcessorTest {
         .and().generatesSources(generatedBullet);
   }
 
-    @Test public void simpleComponentWithNesting() {
-        JavaFileObject nestedTypesFile = JavaFileObjects.forSourceLines("test.OuterType",
-            "package test;",
-            "",
-            "import dagger.Component;",
-            "import javax.inject.Inject;",
-            "",
-            "final class OuterType {",
-            "  final static class SomeInjectableType {",
-            "    @Inject SomeInjectableType() {}",
-            "  }",
-            "",
-            "  @Component",
-            "  interface SimpleComponent {",
-            "    SomeInjectableType someInjectableType();",
-            "  }",
-            "}");
-        JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.Bullet_OuterType_SimpleComponent",
-            "package test;",
-            "",
-            "@javax.annotation.Generated(\"bullet.impl.ComponentProcessor\")",
-            "public final class Bullet_OuterType_SimpleComponent implements bullet.ObjectGraph {",
-            "  private final test.OuterType.SimpleComponent component;",
-            "",
-            "  public Bullet_OuterType_SimpleComponent(test.OuterType.SimpleComponent component) {",
-            "    this.component = component;",
-            "  }",
-            "",
-            "  @Override",
-            "  public <T> T get(Class<T> type) {",
-            "    if (type == test.OuterType.SomeInjectableType.class) {",
-            "      return type.cast(this.component.someInjectableType());",
-            "    }",
-            "    throw new IllegalArgumentException()",
-            "  }",
-            "",
-            "  @Override",
-            "  public <T> T inject(T instance) {",
-            "    throw new UnsupportedOperationException();",
-            "  }",
-            "}");
-        assert_().about(javaSources()).that(ImmutableList.of(nestedTypesFile))
-            .processedWith(new ComponentProcessor())
-            .compilesWithoutError()
-            .and().generatesSources(generatedBullet);
-    }
+  @Test public void simpleComponentWithNesting() {
+    JavaFileObject nestedTypesFile = JavaFileObjects.forSourceLines("test.OuterType",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "import javax.inject.Inject;",
+        "",
+        "final class OuterType {",
+        "  final static class A {",
+        "    @Inject A() {}",
+        "  }",
+        "  final static class B {",
+        "    @Inject A a;",
+        "  }",
+        "  @Component interface SimpleComponent {",
+        "    A a();",
+        "    void inject(B b);",
+        "  }",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.Bullet_OuterType_SimpleComponent",
+        "package test;",
+        "",
+        "@javax.annotation.Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class Bullet_OuterType_SimpleComponent implements bullet.ObjectGraph {",
+        "  private final test.OuterType.SimpleComponent component;",
+        "",
+        "  public Bullet_OuterType_SimpleComponent(test.OuterType.SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(Class<T> type) {",
+        "    if (type == test.OuterType.A.class) {",
+        "      return type.cast(this.component.a());",
+        "    }",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T inject(T instance) {",
+        "    if (instance instanceof test.OuterType.B) {",
+        "      this.component.inject((test.OuterType.B) instance)",
+        "      return instance;",
+        "    }",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(nestedTypesFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
+
+  @Test public void membersInjectionTypePrecedence() {
+    JavaFileObject iFile = JavaFileObjects.forSourceLines("test.I",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "interface I {",
+        "  @Inject void setE(E e);",
+        "}");
+    JavaFileObject i2File = JavaFileObjects.forSourceLines("test.I2",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "interface I2 extends I {",
+        "  @Inject void setC(C c);",
+        "}");
+    JavaFileObject aFile = JavaFileObjects.forSourceLines("test.A",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class A implements I {",
+        "  public void setE(E e) {};",
+        "}");
+    JavaFileObject bFile = JavaFileObjects.forSourceLines("test.B",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "class B {",
+        "  @Inject A a;",
+        "}");
+    JavaFileObject cFile = JavaFileObjects.forSourceLines("test.C",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "import javax.inject.Provider;",
+        "",
+        "final class C extends B {",
+        "  @Inject Provider<I> iProvider;",
+        "}");
+    JavaFileObject dFile = JavaFileObjects.forSourceLines("test.D",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class D implements I2 {",
+        "  public void setC(C c) {}",
+        "  public void setE(E e) {}",
+        "}");
+    JavaFileObject eFile = JavaFileObjects.forSourceLines("test.E",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class E {",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
+        "package test;",
+        "",
+        "import dagger.Component;",
+        "",
+        "@Component",
+        "interface SimpleComponent {",
+        "  void inject(I i);",
+        "  void inject(I2 i1);",
+        "  void inject(A a);",
+        "  void inject(B b);",
+        "  void inject(C c);",
+        "  void inject(D d);",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.Bullet_SimpleComponent",
+        "package test;",
+        "",
+        "@javax.annotation.Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class Bullet_SimpleComponent implements bullet.ObjectGraph {",
+        "  private final test.SimpleComponent component;",
+        "",
+        "  public Bullet_SimpleComponent(test.SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(Class<T> type) {",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        /*
+         * Note:
+         *  - A before I (as A implements I)
+         *  - C before B (as C extends B)
+         *  - D before I2 (as D implements I2)
+         *  - I2 before I (as I2 extends I)
+         *  - A before B, C and D; and D after A, B and C (natural ordering of names)
+         */
+      "  public <T> T inject(T instance) {",
+        "    if (instance instanceof test.A) {" +
+        "      this.component.inject((test.A) instance);" +
+        "      return instance;" +
+        "    }" +
+        "    if (instance instanceof test.C) {" +
+        "      this.component.inject((test.C) instance);" +
+        "      return instance;" +
+        "    }" +
+        "    if (instance instanceof test.B) {" +
+        "      this.component.inject((test.B) instance);" +
+        "      return instance;" +
+        "    }" +
+        "    if (instance instanceof test.D) {" +
+        "      this.component.inject((test.D) instance);" +
+        "      return instance;" +
+        "    }" +
+        "    if (instance instanceof test.I2) {" +
+        "      this.component.inject((test.I2) instance);" +
+        "      return instance;" +
+        "    }" +
+        "    if (instance instanceof test.I) {" +
+        "      this.component.inject((test.I) instance);" +
+        "      return instance;" +
+        "    }",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(iFile, i2File, aFile, bFile, cFile, dFile, eFile, componentFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
 }
