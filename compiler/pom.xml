@@ -46,4 +46,38 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <minimizeJar>true</minimizeJar>
+          <artifactSet>
+            <excludes>
+              <exclude>com.google.auto.service:auto-service</exclude>
+            </excludes>
+          </artifactSet>
+          <relocations>
+            <relocation>
+              <pattern>com.google</pattern>
+              <shadedPattern>bullet.thirdparty.com.google</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.squareup</pattern>
+              <shadedPattern>bullet.thirdparty.com.squareup</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
