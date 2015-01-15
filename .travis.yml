@@ -1,0 +1,18 @@
+language: java
+
+jdk:
+  - oraclejdk7
+  - openjdk7
+  - oraclejdk8
+
+after_success:
+  - ci/deploy-snapshot.sh
+
+notifications:
+  email: false
+
+sudo: false
+cache:
+  directories:
+    - $HOME/.m2
+
