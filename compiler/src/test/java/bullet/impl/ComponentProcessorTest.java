@@ -47,18 +47,21 @@ public class ComponentProcessorTest {
         "package test;",
         "",
         "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
         "import javax.annotation.Generated;",
         "",
         "@Generated(\"bullet.impl.ComponentProcessor\")",
         "public final class Bullet_SimpleComponent implements ObjectGraph {",
         "  private final SimpleComponent component;",
         "",
-        "  public Bullet_SimpleComponent(SimpleComponent component) {",
+        "  public Bullet_SimpleComponent(final SimpleComponent component) {",
         "    this.component = component;",
         "  }",
         "",
         "  @Override",
-        "  public <T> T get(Class<T> type) {",
+        "  public <T> T get(final Class<T> type) {",
         "    if (type == SomeInjectableType.class) {",
         "      return type.cast(this.component.someInjectableType());",
         "    }",
@@ -66,7 +69,7 @@ public class ComponentProcessorTest {
         "  }",
         "",
         "  @Override",
-        "  public <T> T inject(T instance) {",
+        "  public <T> T inject(final T instance) {",
         "    throw new IllegalArgumentException();",
         "  }",
         "}");
@@ -99,31 +102,31 @@ public class ComponentProcessorTest {
         "package test;",
         "",
         "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
         "import javax.annotation.Generated;",
-        "import test.OuterType.A;",
-        "import test.OuterType.B;",
-        "import test.OuterType.SimpleComponent;",
         "",
         "@Generated(\"bullet.impl.ComponentProcessor\")",
         "public final class Bullet_OuterType_SimpleComponent implements ObjectGraph {",
-        "  private final SimpleComponent component;",
+        "  private final OuterType.SimpleComponent component;",
         "",
-        "  public Bullet_OuterType_SimpleComponent(SimpleComponent component) {",
+        "  public Bullet_OuterType_SimpleComponent(final OuterType.SimpleComponent component) {",
         "    this.component = component;",
         "  }",
         "",
         "  @Override",
-        "  public <T> T get(Class<T> type) {",
-        "    if (type == A.class) {",
+        "  public <T> T get(final Class<T> type) {",
+        "    if (type == OuterType.A.class) {",
         "      return type.cast(this.component.a());",
         "    }",
         "    throw new IllegalArgumentException()",
         "  }",
         "",
         "  @Override",
-        "  public <T> T inject(T instance) {",
-        "    if (instance instanceof B) {",
-        "      this.component.inject((B) instance)",
+        "  public <T> T inject(final T instance) {",
+        "    if (instance instanceof OuterType.B) {",
+        "      this.component.inject((OuterType.B) instance)",
         "      return instance;",
         "    }",
         "    throw new IllegalArgumentException();",
@@ -211,18 +214,21 @@ public class ComponentProcessorTest {
         "package test;",
         "",
         "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
         "import javax.annotation.Generated;",
         "",
         "@Generated(\"bullet.impl.ComponentProcessor\")",
         "public final class Bullet_SimpleComponent implements ObjectGraph {",
         "  private final SimpleComponent component;",
         "",
-        "  public Bullet_SimpleComponent(SimpleComponent component) {",
+        "  public Bullet_SimpleComponent(final SimpleComponent component) {",
         "    this.component = component;",
         "  }",
         "",
         "  @Override",
-        "  public <T> T get(Class<T> type) {",
+        "  public <T> T get(final Class<T> type) {",
         "    throw new IllegalArgumentException()",
         "  }",
         "",
@@ -235,30 +241,30 @@ public class ComponentProcessorTest {
          *  - I2 before I (as I2 extends I)
          *  - A before B, C and D; and D after A, B and C (natural ordering of names)
          */
-      "  public <T> T inject(T instance) {",
-        "    if (instance instanceof A) {" +
-        "      this.component.inject((A) instance);" +
-        "      return instance;" +
-        "    }" +
-        "    if (instance instanceof C) {" +
-        "      this.component.inject((C) instance);" +
-        "      return instance;" +
-        "    }" +
-        "    if (instance instanceof B) {" +
-        "      this.component.inject((B) instance);" +
-        "      return instance;" +
-        "    }" +
-        "    if (instance instanceof D) {" +
-        "      this.component.inject((D) instance);" +
-        "      return instance;" +
-        "    }" +
-        "    if (instance instanceof I2) {" +
-        "      this.component.inject((I2) instance);" +
-        "      return instance;" +
-        "    }" +
-        "    if (instance instanceof I) {" +
-        "      this.component.inject((I) instance);" +
-        "      return instance;" +
+      "  public <T> T inject(final T instance) {",
+        "    if (instance instanceof A) {",
+        "      this.component.inject((A) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof C) {",
+        "      this.component.inject((C) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof B) {",
+        "      this.component.inject((B) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof D) {",
+        "      this.component.inject((D) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof I2) {",
+        "      this.component.inject((I2) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof I) {",
+        "      this.component.inject((I) instance);",
+        "      return instance;",
         "    }",
         "    throw new IllegalArgumentException();",
         "  }",

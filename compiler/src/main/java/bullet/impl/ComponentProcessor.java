@@ -15,9 +15,12 @@
  */
 package bullet.impl;
 
+import static javax.lang.model.element.Modifier.*;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -31,32 +34,26 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
+import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
-import com.squareup.javawriter.ClassName;
-import com.squareup.javawriter.ClassWriter;
-import com.squareup.javawriter.ConstructorWriter;
-import com.squareup.javawriter.JavaWriter;
-import com.squareup.javawriter.MethodWriter;
-import com.squareup.javawriter.ParameterizedTypeName;
-import com.squareup.javawriter.TypeNames;
-import com.squareup.javawriter.TypeVariableName;
-
-import bullet.ObjectGraph;
+import com.squareup.javapoet.AnnotationSpec;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.JavaPoet;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.Types;
 
 @AutoService(Processor.class)
 @SupportedAnnotationTypes(ComponentProcessor.DAGGER_COMPONENT)
@@ -97,7 +94,7 @@ public class ComponentProcessor extends AbstractProcessor {
     }
     // Order members-injection methods from most-specific to least-specific types, for cascading ifs of instanceof.
     Collections.sort(membersInjectionMethods, new Comparator<ExecutableElement>() {
-      final Types typeUtils = processingEnv.getTypeUtils();
+      final javax.lang.model.util.Types typeUtils = processingEnv.getTypeUtils();
 
       @Override
       public int compare(ExecutableElement o1, ExecutableElement o2) {
@@ -115,76 +112,86 @@ public class ComponentProcessor extends AbstractProcessor {
       }
     });
 
-    ClassName name = buildName(element);
-    ClassWriter classWriter = ClassWriter.forClassName(name);
-    classWriter.addOriginatingElement(element);
-    classWriter.annotate(Generated.class)
-        .setValue(ComponentProcessor.class.getCanonicalName());
-    classWriter.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
-    classWriter.addImplementedType(ClassName.fromClass(ObjectGraph.class));
+    final ClassName elementName = ClassName.get(element);
 
-    classWriter.addField(element, "component")
-        .addModifiers(Modifier.PRIVATE, Modifier.FINAL);
+// TODO: pending https://github.com/square/javapoet/pull/181
+//    TypeSpec.classBuilder("Bullet_" + Joiner.on("_").join(elementName.simpleNames()))
+    final TypeSpec.Builder classBuilder = TypeSpec.classBuilder(buildBulletSimpleName(elementName))
+        .addOriginatingElement(element)
+        .addAnnotation(AnnotationSpec.builder(Generated.class)
+            .addMember("value", "$S", getClass().getCanonicalName())
+            .build())
+        .addModifiers(PUBLIC, FINAL)
+        .addSuperinterface(ClassName.get("bullet", "ObjectGraph"))
 
-    ConstructorWriter ctorWriter = classWriter.addConstructor();
-    ctorWriter.addModifier(Modifier.PUBLIC);
-    ctorWriter.addParameter(element, "component");
-    ctorWriter.body().addSnippet("this.component = component;");
+        .addField(elementName, "component", PRIVATE, FINAL)
 
-    TypeVariableName t = TypeVariableName.create("T");
-    MethodWriter getWriter = classWriter.addMethod(t, "get");
-    getWriter.annotate(Override.class);
-    getWriter.addModifier(Modifier.PUBLIC);
-    getWriter.addTypeVariable(t);
-    getWriter.addParameter(ParameterizedTypeName.create(Class.class, t), "type");
+        .addMethod(MethodSpec.constructorBuilder()
+            .addModifiers(PUBLIC)
+            .addParameter(elementName, "component", FINAL)
+            .addCode("this.component = component;\n")
+            .build());
+
+    final TypeVariable<?> t = Types.typeVariable("T");
+    final MethodSpec.Builder getBuilder = MethodSpec.methodBuilder("get")
+        .addAnnotation(Override.class)
+        .addModifiers(PUBLIC)
+        .addTypeVariable(t)
+        .returns(t)
+        .addParameter(Types.parameterizedType(Class.class, t), "type", FINAL);
     for (ExecutableElement method : provisionMethods) {
-      getWriter.body().addSnippet(
-          "if (type == %s.class) {\n" +
-              "  return type.cast(this.component.%s());\n" +
-              "}",
-          TypeNames.forTypeMirror(method.getReturnType()), method.getSimpleName());
+      getBuilder.addCode(
+          "if (type == $T.class) {\n$>" +
+              "return type.cast(this.component.$N());\n" +
+              "$<}\n",
+          method.getReturnType(), method.getSimpleName());
     }
     // TODO: exception message
-    getWriter.body().addSnippet("throw new %s();", ClassName.fromClass(IllegalArgumentException.class));
+    getBuilder.addCode("throw new $T();\n", IllegalArgumentException.class);
+    classBuilder.addMethod(getBuilder.build());
 
-    MethodWriter injectWriter = classWriter.addMethod(t, "inject");
-    injectWriter.annotate(Override.class);
-    injectWriter.addModifier(Modifier.PUBLIC);
-    injectWriter.addTypeVariable(t);
-    injectWriter.addParameter(t, "instance");
+    final MethodSpec.Builder injectWriter = MethodSpec.methodBuilder("inject")
+        .addAnnotation(Override.class)
+        .addModifiers(PUBLIC)
+        .addTypeVariable(t)
+        .returns(t)
+        .addParameter(t, "instance", FINAL);
     for (ExecutableElement method : membersInjectionMethods) {
-      injectWriter.body().addSnippet(
-          "if (instance instanceof %1$s) {\n" +
-          "  this.component.%2$s((%1$s) instance);\n" +
-          "  return instance;\n" +
-          "}",
-          TypeNames.forTypeMirror(Iterables.getOnlyElement(method.getParameters()).asType()), method.getSimpleName());
+      TypeMirror type = Iterables.getOnlyElement(method.getParameters()).asType();
+      injectWriter.addCode(
+          "if (instance instanceof $T) {\n$>" +
+          "this.component.$N(($T) instance);\n" +
+          "return instance;\n" +
+          "$<}\n",
+          type, method.getSimpleName(), type);
     }
     // TODO: exception message
-    injectWriter.body().addSnippet("throw new %s();", ClassName.fromClass(IllegalArgumentException.class));
+    injectWriter.addCode("throw new $T();\n", IllegalArgumentException.class);
+    classBuilder.addMethod(injectWriter.build());
 
     try {
-      JavaWriter.create()
-          .addTypeWriter(classWriter)
+      new JavaPoet()
+          .add(elementName.packageName(), classBuilder.build())
           .writeTo(processingEnv.getFiler());
     } catch (IOException ioe) {
       StringWriter sw = new StringWriter();
       PrintWriter pw = new PrintWriter(sw);
-      pw.println("Error generating source file for type " + name);
+      pw.println("Error generating source file for type " + classBuilder.build().name);
       ioe.printStackTrace(pw);
       pw.close();
       processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, sw.toString());
     }
   }
 
-  private ClassName buildName(Element element) {
-    String name = element.getSimpleName().toString();
-    for (element = element.getEnclosingElement(); element.getKind() != ElementKind.PACKAGE; element = element.getEnclosingElement()) {
-      name = element.getSimpleName() + "_" + name;
+  private String buildBulletSimpleName(ClassName elementName) {
+    List<CharSequence> name = new ArrayList<>();
+    name.add(elementName.simpleName());
+    for (elementName = elementName.enclosingClassName(); elementName != null; elementName = elementName.enclosingClassName()) {
+      name.add(elementName.simpleName());
     }
-    assert element.getKind() == ElementKind.PACKAGE;
-    final String packageName = processingEnv.getElementUtils().getPackageOf(element).getQualifiedName().toString();
-    return ClassName.create(packageName, "Bullet_" + name);
+    name.add("Bullet");
+    Collections.reverse(name);
+    return Joiner.on("_").join(name);
   }
 
   // This method has been copied from Dagger 2

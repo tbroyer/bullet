@@ -12,17 +12,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>bullet</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
       <groupId>com.google.auto</groupId>
       <artifactId>auto-common</artifactId>
     </dependency>
     <dependency>
       <groupId>com.squareup</groupId>
-      <artifactId>javawriter</artifactId>
+      <artifactId>javapoet</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.auto.service</groupId>
@@ -38,6 +33,12 @@
     <dependency>
       <groupId>com.google.testing.compile</groupId>
       <artifactId>compile-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>bullet</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

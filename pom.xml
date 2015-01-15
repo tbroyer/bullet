@@ -87,8 +87,8 @@
       </dependency>
       <dependency>
         <groupId>com.squareup</groupId>
-        <artifactId>javawriter</artifactId>
-        <version>3.0.0-SNAPSHOT</version>
+        <artifactId>javapoet</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
       </dependency>
 
       <dependency>
