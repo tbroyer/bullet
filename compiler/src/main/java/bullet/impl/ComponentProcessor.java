@@ -28,6 +28,7 @@ import javax.annotation.Generated;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -56,15 +57,12 @@ import com.squareup.javawriter.TypeNames;
 import com.squareup.javawriter.TypeVariableName;
 
 import bullet.ObjectGraph;
-import dagger.Component;
 
 @AutoService(Processor.class)
+@SupportedAnnotationTypes(ComponentProcessor.DAGGER_COMPONENT)
 public class ComponentProcessor extends AbstractProcessor {
 
-  @Override
-  public Set<String> getSupportedAnnotationTypes() {
-    return Collections.singleton(Component.class.getName());
-  }
+  static final String DAGGER_COMPONENT = "dagger.Component";
 
   @Override
   public SourceVersion getSupportedSourceVersion() {
@@ -73,7 +71,9 @@ public class ComponentProcessor extends AbstractProcessor {
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-    Set<? extends Element> componentElements = roundEnv.getElementsAnnotatedWith(Component.class);
+
+    Set<? extends Element> componentElements = roundEnv.getElementsAnnotatedWith(
+        processingEnv.getElementUtils().getTypeElement(DAGGER_COMPONENT));
 
     for (Element element : componentElements) {
       if (SuperficialValidation.validateElement(element)) {

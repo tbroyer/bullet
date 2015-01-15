@@ -17,10 +17,6 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.google.dagger</groupId>
-      <artifactId>dagger</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.auto</groupId>
       <artifactId>auto-common</artifactId>
     </dependency>
@@ -42,6 +38,11 @@
     <dependency>
       <groupId>com.google.testing.compile</groupId>
       <artifactId>compile-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.dagger</groupId>
+      <artifactId>dagger</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
