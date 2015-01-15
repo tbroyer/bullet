@@ -1,6 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.sonatype.oss</groupId>
+    <artifactId>oss-parent</artifactId>
+    <version>9</version>
+  </parent>
+
   <groupId>net.ltgt.dagger</groupId>
   <artifactId>bullet-parent</artifactId>
   <packaging>pom</packaging>
@@ -8,6 +15,7 @@
 
   <name>Bullet (Parent)</name>
   <description>Provides Dagger1-like ObjectGraph API around Dagger2 Components</description>
+  <url>https://github.com/tbroyer/bullet</url>
 
   <modules>
     <module>compiler</module>
