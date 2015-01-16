@@ -114,9 +114,7 @@ public class ComponentProcessor extends AbstractProcessor {
 
     final ClassName elementName = ClassName.get(element);
 
-// TODO: pending https://github.com/square/javapoet/pull/181
-//    TypeSpec.classBuilder("Bullet_" + Joiner.on("_").join(elementName.simpleNames()))
-    final TypeSpec.Builder classBuilder = TypeSpec.classBuilder(buildBulletSimpleName(elementName))
+    final TypeSpec.Builder classBuilder = TypeSpec.classBuilder("Bullet_" + Joiner.on("_").join(elementName.simpleNames()))
         .addOriginatingElement(element)
         .addAnnotation(AnnotationSpec.builder(Generated.class)
             .addMember("value", "$S", getClass().getCanonicalName())
@@ -181,17 +179,6 @@ public class ComponentProcessor extends AbstractProcessor {
       pw.close();
       processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, sw.toString());
     }
-  }
-
-  private String buildBulletSimpleName(ClassName elementName) {
-    List<CharSequence> name = new ArrayList<>();
-    name.add(elementName.simpleName());
-    for (elementName = elementName.enclosingClassName(); elementName != null; elementName = elementName.enclosingClassName()) {
-      name.add(elementName.simpleName());
-    }
-    name.add("Bullet");
-    Collections.reverse(name);
-    return Joiner.on("_").join(name);
   }
 
   // This method has been copied from Dagger 2
