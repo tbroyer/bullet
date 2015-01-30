@@ -20,7 +20,6 @@ import static javax.lang.model.element.Modifier.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -50,10 +49,11 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.JavaPoet;
+import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.Types;
+import com.squareup.javapoet.TypeVariableName;
 
 @AutoService(Processor.class)
 @SupportedAnnotationTypes(ComponentProcessor.DAGGER_COMPONENT)
@@ -130,13 +130,13 @@ public class ComponentProcessor extends AbstractProcessor {
             .addCode("this.component = component;\n")
             .build());
 
-    final TypeVariable<?> t = Types.typeVariable("T");
+    final TypeVariableName t = TypeVariableName.get("T");
     final MethodSpec.Builder getBuilder = MethodSpec.methodBuilder("get")
         .addAnnotation(Override.class)
         .addModifiers(PUBLIC)
         .addTypeVariable(t)
         .returns(t)
-        .addParameter(Types.parameterizedType(Class.class, t), "type", FINAL);
+        .addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), t), "type", FINAL);
     for (ExecutableElement method : provisionMethods) {
       getBuilder.addCode(
           "if (type == $T.class) {\n$>" +
@@ -168,8 +168,8 @@ public class ComponentProcessor extends AbstractProcessor {
     classBuilder.addMethod(injectWriter.build());
 
     try {
-      new JavaPoet()
-          .add(elementName.packageName(), classBuilder.build())
+      JavaFile.builder(elementName.packageName(), classBuilder.build())
+          .build()
           .writeTo(processingEnv.getFiler());
     } catch (IOException ioe) {
       StringWriter sw = new StringWriter();
