@@ -139,6 +139,7 @@ public class ComponentProcessorTest {
   }
 
   @Test public void membersInjectionTypePrecedence() {
+    // XXX: Dagger‡ doesn't support @Inject on abstract methods (e.g. interfaces), but we support it here anyway.
     JavaFileObject iFile = JavaFileObjects.forSourceLines("test.I",
         "package test;",
         "",
