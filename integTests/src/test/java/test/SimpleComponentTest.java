@@ -38,7 +38,7 @@ public class SimpleComponentTest {
   @Before public void setUp() {
     // We cannot spy the Dagger‡ component as it's final, so we wrap it in a mock that delegates to it.
     // We want to test both that the method is called (mockito) and that everything actually works (dagger).
-    SimpleComponent realComponent = Dagger_SimpleComponentTest_SimpleComponent.create();
+    SimpleComponent realComponent = DaggerSimpleComponentTest_SimpleComponent.create();
     this.component = mock(SimpleComponent.class, new ForwardsInvocations(realComponent));
     graph = new Bullet_SimpleComponentTest_SimpleComponent(component);
   }
