@@ -114,7 +114,7 @@ public class ComponentProcessor extends AbstractProcessor {
 
     final ClassName elementName = ClassName.get(element);
 
-    final TypeSpec.Builder classBuilder = TypeSpec.classBuilder("Bullet_" + Joiner.on("_").join(elementName.simpleNames()))
+    final TypeSpec.Builder classBuilder = TypeSpec.classBuilder("Bullet" + Joiner.on("_").join(elementName.simpleNames()))
         .addOriginatingElement(element)
         .addAnnotation(AnnotationSpec.builder(Generated.class)
             .addMember("value", "$S", getClass().getCanonicalName())

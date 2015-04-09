@@ -40,7 +40,7 @@ public class SimpleComponentTest {
     // We want to test both that the method is called (mockito) and that everything actually works (dagger).
     SimpleComponent realComponent = DaggerSimpleComponentTest_SimpleComponent.create();
     this.component = mock(SimpleComponent.class, new ForwardsInvocations(realComponent));
-    graph = new Bullet_SimpleComponentTest_SimpleComponent(component);
+    graph = new BulletSimpleComponentTest_SimpleComponent(component);
   }
 
   @Test public void testSimpleComponent() {

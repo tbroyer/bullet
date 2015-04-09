@@ -13,7 +13,7 @@ Snapshots of the development version are available in [Sonatype's `snapshots` re
 Usage
 -----
 
-Bullet• generates a class with a `Bullet_` prefix next to your components
+Bullet• generates a class with a `Bullet` prefix next to your components
 (and next to the `Dagger_`-prefixed class that Dagger‡ generates),
 whose constructor expects an instance of your component as argument,
 and which implements the `bullet.ObjectGraph` interface providing:
