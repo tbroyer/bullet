@@ -42,7 +42,6 @@ import javax.tools.Diagnostic;
 import com.google.auto.common.BasicAnnotationProcessor;
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
-import com.google.auto.common.SuperficialValidation;
 import com.google.auto.common.Visibility;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
@@ -75,10 +74,8 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
     Set<Element> componentElements = elementsByAnnotation.get(Component.class);
 
     for (Element element : componentElements) {
-      if (SuperficialValidation.validateElement(element)) {
-        TypeElement componentElement = MoreElements.asType(element);
-        generateObjectGraph(componentElement);
-      }
+      TypeElement componentElement = MoreElements.asType(element);
+      generateObjectGraph(componentElement);
     }
   }
 
