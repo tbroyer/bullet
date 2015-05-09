@@ -13,7 +13,7 @@ import bullet.ObjectGraph;
 import dagger.Component;
 import dagger.Subcomponent;
 
-public class SimpleComponentTest {
+public class SimpleSubcomponentTest {
 
   static class A {
     @Inject A() {}
@@ -30,31 +30,35 @@ public class SimpleComponentTest {
     @Inject NotInComponent() {}
   }
 
+  @Component
+  interface SimpleComponent {
+    SimpleSubcomponent subcomponent();
+  }
   @Subcomponent
-  interface SimpleSubcomponent {
+  interface OtherSubcomponent {
     C c();
   }
 
   // XXX: interface must be public for Mockito ForwardsInvocations to work
-  @Component
-  public interface SimpleComponent {
+  @Subcomponent
+  public interface SimpleSubcomponent {
     A a();
     B b();
-    SimpleSubcomponent subcomponent();
+    OtherSubcomponent subcomponent();
   }
 
-  SimpleComponent component;
+  SimpleSubcomponent component;
   ObjectGraph graph;
 
   @Before public void setUp() {
     // We cannot spy the Dagger‡ component as it's final, so we wrap it in a mock that delegates to it.
     // We want to test both that the method is called (mockito) and that everything actually works (dagger).
-    SimpleComponent realComponent = DaggerSimpleComponentTest_SimpleComponent.create();
-    this.component = mock(SimpleComponent.class, new ForwardsInvocations(realComponent));
-    graph = new BulletSimpleComponentTest_SimpleComponent(component);
+    SimpleSubcomponent realComponent = DaggerSimpleSubcomponentTest_SimpleComponent.create().subcomponent();
+    this.component = mock(SimpleSubcomponent.class, new ForwardsInvocations(realComponent));
+    graph = new BulletSimpleSubcomponentTest_SimpleSubcomponent(component);
   }
 
-  @Test public void testSimpleComponent() {
+  @Test public void testSimpleSubcomponent() {
     A a = graph.get(A.class);
     verify(component).a();
     assertThat(a).isNotNull();
@@ -67,7 +71,7 @@ public class SimpleComponentTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void throwsOnSubcomponent() {
-    graph.get(SimpleSubcomponent.class);
+    graph.get(OtherSubcomponent.class);
   }
 
   @Test(expected = IllegalArgumentException.class)

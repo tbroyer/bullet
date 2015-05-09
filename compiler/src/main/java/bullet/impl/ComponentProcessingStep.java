@@ -45,7 +45,9 @@ import com.google.auto.common.MoreTypes;
 import com.google.auto.common.Visibility;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
+import com.google.common.collect.Sets;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
@@ -55,6 +57,7 @@ import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 
 import dagger.Component;
+import dagger.Subcomponent;
 
 class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep {
 
@@ -66,12 +69,14 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
 
   @Override
   public Set<? extends Class<? extends Annotation>> annotations() {
-    return Collections.singleton(Component.class);
+    return ImmutableSet.of(Component.class, Subcomponent.class);
   }
 
   @Override
   public void process(SetMultimap<Class<? extends Annotation>, Element> elementsByAnnotation) {
-    Set<Element> componentElements = elementsByAnnotation.get(Component.class);
+    Set<Element> componentElements = Sets.union(
+        elementsByAnnotation.get(Component.class),
+        elementsByAnnotation.get(Subcomponent.class));
 
     for (Element element : componentElements) {
       TypeElement componentElement = MoreElements.asType(element);
@@ -85,6 +90,9 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
     PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
     for (ExecutableElement method : ElementFilter.methodsIn(processingEnv.getElementUtils().getAllMembers(element))) {
       if (!isVisibleFrom(method, packageElement)) {
+        continue;
+      }
+      if (isSubcomponentMethod(method)) {
         continue;
       }
       if (isComponentProvisionMethod(method)) {
@@ -200,6 +208,14 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
       default:
         throw new AssertionError();
     }
+  }
+
+  private boolean isSubcomponentMethod(ExecutableElement method) {
+    Element returnType = processingEnv.getTypeUtils().asElement(method.getReturnType());
+    if (returnType == null) {
+      return false;
+    }
+    return returnType.getAnnotation(Subcomponent.class) != null;
   }
 
   // This method has been copied from Dagger 2

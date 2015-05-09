@@ -17,13 +17,18 @@ package bullet.impl;
 
 import static com.google.common.truth.Truth.assert_;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+
+import java.lang.annotation.Annotation;
+
 import com.google.common.collect.ImmutableList;
 import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 
 import org.junit.Test;
 
-public class ComponentProcessorTest {
+public abstract class AbstractComponentProcessorTest {
+
+  protected abstract Class<? extends Annotation> getComponentType();
 
   @Test public void simpleComponent() {
     JavaFileObject injectableTypeFile = JavaFileObjects.forSourceLines("test.SomeInjectableType",
@@ -34,14 +39,32 @@ public class ComponentProcessorTest {
         "final class SomeInjectableType {",
         "  @Inject SomeInjectableType() {}",
         "}");
+    JavaFileObject otherInjectableTypeFile = JavaFileObjects.forSourceLines("test.OtherInjectableType",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class OtherInjectableType {",
+        "  @Inject OtherInjectableType() {}",
+        "}");
+    JavaFileObject subcomponentFile = JavaFileObjects.forSourceLines("test.SimpleSubcomponent",
+        "package test;",
+        "",
+        "import dagger.Subcomponent;",
+        "",
+        "@Subcomponent",
+        "interface SimpleSubcomponent {",
+        "  OtherInjectableType otherInjectableType();",
+        "}");
     JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
         "package test;",
         "",
-        "import dagger.Component;",
+        "import " + getComponentType().getCanonicalName() + ";",
         "",
-        "@Component",
+        "@" + getComponentType().getSimpleName(),
         "interface SimpleComponent {",
         "  SomeInjectableType someInjectableType();",
+        "  SimpleSubcomponent simpleSubcomponent();",
         "}");
     JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.BulletSimpleComponent",
         "package test;",
@@ -73,7 +96,7 @@ public class ComponentProcessorTest {
         "    throw new IllegalArgumentException();",
         "  }",
         "}");
-    assert_().about(javaSources()).that(ImmutableList.of(injectableTypeFile, componentFile))
+    assert_().about(javaSources()).that(ImmutableList.of(injectableTypeFile, otherInjectableTypeFile, subcomponentFile, componentFile))
         .processedWith(new ComponentProcessor())
         .compilesWithoutError()
         .and().generatesSources(generatedBullet);
@@ -83,7 +106,7 @@ public class ComponentProcessorTest {
     JavaFileObject nestedTypesFile = JavaFileObjects.forSourceLines("test.OuterType",
         "package test;",
         "",
-        "import dagger.Component;",
+        "import " + getComponentType().getCanonicalName() + ";",
         "import javax.inject.Inject;",
         "",
         "final class OuterType {",
@@ -93,7 +116,7 @@ public class ComponentProcessorTest {
         "  final static class B {",
         "    @Inject A a;",
         "  }",
-        "  @Component interface SimpleComponent {",
+        "  @" + getComponentType().getSimpleName() + " interface SimpleComponent {",
         "    A a();",
         "    void inject(B b);",
         "  }",
@@ -200,9 +223,9 @@ public class ComponentProcessorTest {
     JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
         "package test;",
         "",
-        "import dagger.Component;",
+        "import " + getComponentType().getCanonicalName() + ";",
         "",
-        "@Component",
+        "@" + getComponentType().getSimpleName(),
         "interface SimpleComponent {",
         "  void inject(I i);",
         "  void inject(I2 i1);",
@@ -242,7 +265,7 @@ public class ComponentProcessorTest {
          *  - I2 before I (as I2 extends I)
          *  - A before B, C and D; and D after A, B and C (natural ordering of names)
          */
-      "  public <T> T inject(final T instance) {",
+        "  public <T> T inject(final T instance) {",
         "    if (instance instanceof A) {",
         "      this.component.inject((A) instance);",
         "      return instance;",
@@ -370,9 +393,9 @@ public class ComponentProcessorTest {
     JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
         "package test;",
         "",
-        "import dagger.Component;",
+        "import " + getComponentType().getCanonicalName() + ";",
         "",
-        "@Component",
+        "@" + getComponentType().getSimpleName(),
         "class SimpleComponent extends SuperComponent {",
         "  protected G protectedMethod() { return null; }",
         "  private H privateMethod() { return null; }",
