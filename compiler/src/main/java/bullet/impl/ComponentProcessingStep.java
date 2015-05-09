@@ -31,6 +31,7 @@ import javax.annotation.Generated;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
@@ -42,6 +43,7 @@ import com.google.auto.common.BasicAnnotationProcessor;
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.auto.common.SuperficialValidation;
+import com.google.auto.common.Visibility;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
@@ -83,7 +85,11 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
   private void generateObjectGraph(TypeElement element) {
     ArrayList<ExecutableElement> provisionMethods = new ArrayList<>();
     ArrayList<ExecutableElement> membersInjectionMethods = new ArrayList<>();
+    PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
     for (ExecutableElement method : ElementFilter.methodsIn(processingEnv.getElementUtils().getAllMembers(element))) {
+      if (!isVisibleFrom(method, packageElement)) {
+        continue;
+      }
       if (isComponentProvisionMethod(method)) {
         provisionMethods.add(method);
       } else if (isComponentMembersInjectionMethod(method)) {
@@ -136,6 +142,9 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
         .returns(t)
         .addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), t), "type", FINAL);
     for (ExecutableElement method : provisionMethods) {
+      if (!isVisibleFrom(processingEnv.getTypeUtils().asElement(method.getReturnType()), packageElement)) {
+        continue;
+      }
       getBuilder.addCode(
           "if (type == $T.class) {\n$>" +
               "return type.cast(this.component.$N());\n" +
@@ -154,6 +163,9 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
         .addParameter(t, "instance", FINAL);
     for (ExecutableElement method : membersInjectionMethods) {
       TypeMirror type = Iterables.getOnlyElement(method.getParameters()).asType();
+      if (!isVisibleFrom(processingEnv.getTypeUtils().asElement(type), packageElement)) {
+        continue;
+      }
       injectWriter.addCode(
           "if (instance instanceof $T) {\n$>" +
           "this.component.$N(($T) instance);\n" +
@@ -176,6 +188,20 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
       ioe.printStackTrace(pw);
       pw.close();
       processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, sw.toString());
+    }
+  }
+
+  private boolean isVisibleFrom(Element target, PackageElement from) {
+    switch (Visibility.effectiveVisibilityOfElement(target)) {
+      case PUBLIC:
+        return true;
+      case PROTECTED:
+      case DEFAULT:
+        return MoreElements.getPackage(target).equals(from);
+      case PRIVATE:
+        return false;
+      default:
+        throw new AssertionError();
     }
   }
 
