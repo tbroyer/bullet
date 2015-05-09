@@ -444,4 +444,178 @@ public abstract class AbstractComponentProcessorTest {
         .compilesWithoutError()
         .and().generatesSources(generatedBullet);
   }
+
+  @Test public void provider() {
+    JavaFileObject injectableTypeFile = JavaFileObjects.forSourceLines("test.SomeInjectableType",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class SomeInjectableType {",
+        "  @Inject SomeInjectableType() {}",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
+        "package test;",
+        "",
+        "import javax.inject.Provider;",
+        "import " + getComponentType().getCanonicalName() + ";",
+        "",
+        "@" + getComponentType().getSimpleName(),
+        "interface SimpleComponent {",
+        "  Provider<SomeInjectableType> someInjectableType();",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.BulletSimpleComponent",
+        "package test;",
+        "",
+        "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
+        "import javax.annotation.Generated;",
+        "",
+        "@Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class BulletSimpleComponent implements ObjectGraph {",
+        "  private final SimpleComponent component;",
+        "",
+        "  public BulletSimpleComponent(final SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(final Class<T> type) {",
+        "    if (type == SomeInjectableType.class) {",
+        "      return type.cast(this.component.someInjectableType().get());",
+        "    }",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T inject(final T instance) {",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(injectableTypeFile, componentFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
+
+  @Test public void lazy() {
+    JavaFileObject injectableTypeFile = JavaFileObjects.forSourceLines("test.SomeInjectableType",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class SomeInjectableType {",
+        "  @Inject SomeInjectableType() {}",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
+        "package test;",
+        "",
+        "import dagger.Lazy;",
+        "import " + getComponentType().getCanonicalName() + ";",
+        "",
+        "@" + getComponentType().getSimpleName(),
+        "interface SimpleComponent {",
+        "  Lazy<SomeInjectableType> someInjectableType();",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.BulletSimpleComponent",
+        "package test;",
+        "",
+        "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
+        "import javax.annotation.Generated;",
+        "",
+        "@Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class BulletSimpleComponent implements ObjectGraph {",
+        "  private final SimpleComponent component;",
+        "",
+        "  public BulletSimpleComponent(final SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(final Class<T> type) {",
+        "    if (type == SomeInjectableType.class) {",
+        "      return type.cast(this.component.someInjectableType().get());",
+        "    }",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T inject(final T instance) {",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(injectableTypeFile, componentFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
+
+  @Test public void membersInjector() {
+    JavaFileObject aFile = JavaFileObjects.forSourceLines("test.A",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class A {",
+        "  @Inject A() {}",
+        "}");
+    JavaFileObject bFile = JavaFileObjects.forSourceLines("test.B",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class B {",
+        "  @Inject A a;",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
+        "package test;",
+        "",
+        "import dagger.MembersInjector;",
+        "import " + getComponentType().getCanonicalName() + ";",
+        "",
+        "@" + getComponentType().getSimpleName(),
+        "interface SimpleComponent {",
+        "  MembersInjector<B> b();",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.BulletSimpleComponent",
+        "package test;",
+        "",
+        "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
+        "import javax.annotation.Generated;",
+        "",
+        "@Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class BulletSimpleComponent implements ObjectGraph {",
+        "  private final SimpleComponent component;",
+        "",
+        "  public BulletSimpleComponent(final SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(final Class<T> type) {",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T inject(final T instance) {",
+        "    if (instance instanceof B) {",
+        "      this.component.b().injectMembers((B) instance);",
+        "      return instance;",
+        "    }",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(aFile, bFile, componentFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
 }

@@ -22,10 +22,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Set;
+import java.util.TreeMap;
 
 import javax.annotation.Generated;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -33,8 +32,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
@@ -44,7 +42,7 @@ import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.auto.common.Visibility;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Iterables;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
@@ -56,6 +54,7 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 
+import bullet.impl.ComponentMethodDescriptor.ComponentMethodKind;
 import dagger.Component;
 import dagger.Subcomponent;
 
@@ -85,41 +84,58 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
   }
 
   private void generateObjectGraph(TypeElement element) {
-    ArrayList<ExecutableElement> provisionMethods = new ArrayList<>();
-    ArrayList<ExecutableElement> membersInjectionMethods = new ArrayList<>();
-    PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
-    for (ExecutableElement method : ElementFilter.methodsIn(processingEnv.getElementUtils().getAllMembers(element))) {
-      if (!isVisibleFrom(method, packageElement)) {
-        continue;
-      }
-      if (isSubcomponentMethod(method)) {
-        continue;
-      }
-      if (isComponentProvisionMethod(method)) {
-        provisionMethods.add(method);
-      } else if (isComponentMembersInjectionMethod(method)) {
-        membersInjectionMethods.add(method);
-      }
-    }
+    DeclaredType component = MoreTypes.asDeclared(element.asType());
+    ArrayList<ComponentMethodDescriptor> provisionMethods = new ArrayList<>();
     // Order members-injection methods from most-specific to least-specific types, for cascading ifs of instanceof.
-    Collections.sort(membersInjectionMethods, new Comparator<ExecutableElement>() {
+    TreeMap<TypeMirror, ComponentMethodDescriptor> membersInjectionMethods = new TreeMap<>(new Comparator<TypeMirror>() {
       final javax.lang.model.util.Types typeUtils = processingEnv.getTypeUtils();
 
       @Override
-      public int compare(ExecutableElement o1, ExecutableElement o2) {
-        TypeMirror p1 = Iterables.getOnlyElement(o1.getParameters()).asType(), p2 = Iterables.getOnlyElement(o2.getParameters()).asType();
-        if (typeUtils.isSubtype(p1, p2)) {
+      public int compare(TypeMirror o1, TypeMirror o2) {
+        if (typeUtils.isSubtype(o1, o2)) {
           return -1;
-        } else if (typeUtils.isSubtype(p2, p1)) {
+        } else if (typeUtils.isSubtype(o2, o1)) {
           return 1;
         }
-        return getName(p1).compareTo(getName(p2));
+        return getName(o1).compareTo(getName(o2));
       }
 
       private String getName(TypeMirror type) {
         return MoreElements.asType(typeUtils.asElement(type)).getQualifiedName().toString();
       }
     });
+
+    PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
+    TypeElement objectElement = processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName());
+    for (ExecutableElement method : ElementFilter.methodsIn(processingEnv.getElementUtils().getAllMembers(element))) {
+      if (method.getEnclosingElement().equals(objectElement)) {
+        continue;
+      }
+      if (!isVisibleFrom(method, packageElement)) {
+        continue;
+      }
+      Optional<ComponentMethodDescriptor> optMethodDescriptor =
+          ComponentMethodDescriptor.forComponentMethod(processingEnv.getTypeUtils(), component, method);
+      if (!optMethodDescriptor.isPresent()) {
+        continue;
+      }
+      ComponentMethodDescriptor methodDescriptor = optMethodDescriptor.get();
+      if (!isVisibleFrom(processingEnv.getTypeUtils().asElement(methodDescriptor.type()), packageElement)) {
+        continue;
+      }
+      switch (methodDescriptor.kind()) {
+        case SIMPLE_PROVISION:
+        case PROVIDER_OR_LAZY:
+          provisionMethods.add(methodDescriptor);
+          break;
+        case SIMPLE_MEMBERS_INJECTION:
+        case MEMBERS_INJECTOR:
+          membersInjectionMethods.put(methodDescriptor.type(), methodDescriptor);
+          break;
+        default:
+          throw new AssertionError();
+      }
+    }
 
     final ClassName elementName = ClassName.get(element);
 
@@ -146,15 +162,12 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
         .addTypeVariable(t)
         .returns(t)
         .addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), t), "type", FINAL);
-    for (ExecutableElement method : provisionMethods) {
-      if (!isVisibleFrom(processingEnv.getTypeUtils().asElement(method.getReturnType()), packageElement)) {
-        continue;
-      }
+    for (ComponentMethodDescriptor method : provisionMethods) {
       getBuilder.addCode(
           "if (type == $T.class) {\n$>" +
-              "return type.cast(this.component.$N());\n" +
-              "$<}\n",
-          method.getReturnType(), method.getSimpleName());
+          "return type.cast(this.component.$N()$L);\n" +
+          "$<}\n",
+          method.type(), method.name(), method.kind() == ComponentMethodKind.PROVIDER_OR_LAZY ? ".get()" : "");
     }
     // TODO: exception message
     getBuilder.addCode("throw new $T();\n", IllegalArgumentException.class);
@@ -166,17 +179,13 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
         .addTypeVariable(t)
         .returns(t)
         .addParameter(t, "instance", FINAL);
-    for (ExecutableElement method : membersInjectionMethods) {
-      TypeMirror type = Iterables.getOnlyElement(method.getParameters()).asType();
-      if (!isVisibleFrom(processingEnv.getTypeUtils().asElement(type), packageElement)) {
-        continue;
-      }
+    for (ComponentMethodDescriptor method : membersInjectionMethods.values()) {
       injectWriter.addCode(
           "if (instance instanceof $T) {\n$>" +
-          "this.component.$N(($T) instance);\n" +
+          "this.component.$N$L(($T) instance);\n" +
           "return instance;\n" +
           "$<}\n",
-          type, method.getSimpleName(), type);
+          method.type(), method.name(), method.kind() == ComponentMethodKind.MEMBERS_INJECTOR ? "().injectMembers" : "", method.type());
     }
     // TODO: exception message
     injectWriter.addCode("throw new $T();\n", IllegalArgumentException.class);
@@ -208,34 +217,5 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
       default:
         throw new AssertionError();
     }
-  }
-
-  private boolean isSubcomponentMethod(ExecutableElement method) {
-    Element returnType = processingEnv.getTypeUtils().asElement(method.getReturnType());
-    if (returnType == null) {
-      return false;
-    }
-    return returnType.getAnnotation(Subcomponent.class) != null;
-  }
-
-  // This method has been copied from Dagger 2
-  // Copyright (C) 2014 Google, Inc.
-  private boolean isComponentProvisionMethod(ExecutableElement method) {
-    return method.getParameters().isEmpty()
-        && !method.getReturnType().getKind().equals(TypeKind.VOID)
-        && !processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName())
-            .equals(method.getEnclosingElement());
-  }
-
-  // This method has been copied from Dagger 2
-  // Copyright (C) 2014 Google, Inc.
-  private boolean isComponentMembersInjectionMethod(ExecutableElement method) {
-    List<? extends VariableElement> parameters = method.getParameters();
-    TypeMirror returnType = method.getReturnType();
-    return parameters.size() == 1
-        && (returnType.getKind().equals(TypeKind.VOID)
-            || MoreTypes.equivalence().equivalent(returnType, parameters.get(0).asType()))
-        && !processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName())
-            .equals(method.getEnclosingElement());
   }
 }
