@@ -13,6 +13,13 @@ Snapshots of the development version are available in [Sonatype's `snapshots` re
  [releases]: https://search.maven.org/#search%7Cga%7C1%7Cg%3A%22net.ltgt.dagger%22
  [snap]: https://oss.sonatype.org/content/repositories/snapshots/
 
+When to use Bullet•
+-------------------
+
+If you don't have a use-case for Bullet•, don't use it.
+If you do have a use-case for it, try to refactor your code to remove that need.
+Bullet• can possibly be useful when migrating from Dagger† to Dagger‡, but not everyone agrees.
+
 Usage
 -----
 
@@ -27,9 +34,21 @@ and which implements the `bullet.ObjectGraph` interface providing:
 The `ObjectGraph` will delegate to the appropriate method of the wrapped component depending on the argument
 and, similarly to Dagger†, throw an `IllegalArgumentException` if none can be found.
 
-Bullet• is triggered by Dagger‡'s `@Component` annotation,
+Bullet• is triggered by Dagger‡'s `@Component` and `@Subcomponent` annotations,
 so you only need to put Bullet• in your processor path to get it to work;
 no need to change anything to your component interfaces.
+
+Notes on name and version
+-------------------------
+
+Dagger's name comes from a play on words because it builds a directed acyclic graph (DAG).
+It happens that Unicode has a character named dagger (†): codepoint U+2020.
+Dagger 2 is sometimes shortened to ‡, the double-dagger Unicode character, codepoint U+2021.
+Bullet is thus named after Unicode's U+2022.
+
+Because I started this project only as a proof-of-concept and mostly _for fun_, and to learn more about annotation processors,
+I'll name versions after firearms calibers (not that I like guns or find them “fun” –I don't– but just to continue on the pun),
+possibly ending with a 1.0 _silver bullet_.
 
 License
 -------
