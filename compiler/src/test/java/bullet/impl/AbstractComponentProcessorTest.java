@@ -300,6 +300,101 @@ public abstract class AbstractComponentProcessorTest {
         .and().generatesSources(generatedBullet);
   }
 
+  @Test public void membersInjectionTypePrecedence2() {
+    // See https://code.google.com/p/google-web-toolkit/issues/detail?id=8036
+    JavaFileObject dFile = JavaFileObjects.forSourceLines("test.D",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "final class D {",
+        "  @Inject D() {}",
+        "}");
+    JavaFileObject aFile = JavaFileObjects.forSourceLines("test.A",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "class A {",
+        "  @Inject D d;",
+        "}");
+    JavaFileObject bFile = JavaFileObjects.forSourceLines("test.B",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "",
+        "class B {",
+        "  @Inject D d;",
+        "}");
+    JavaFileObject cFile = JavaFileObjects.forSourceLines("test.C",
+        "package test;",
+        "",
+        "import javax.inject.Inject;",
+        "import javax.inject.Provider;",
+        "",
+        "final class C extends A {",
+        "  @Inject B b;",
+        "}");
+    JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
+        "package test;",
+        "",
+        "import " + getComponentType().getCanonicalName() + ";",
+        "",
+        "@" + getComponentType().getSimpleName(),
+        "interface SimpleComponent {",
+        "  void inject(B b);",
+        "  void inject(A a);",
+        "  void inject(C c);",
+        "}");
+    JavaFileObject generatedBullet = JavaFileObjects.forSourceLines("test.BulletSimpleComponent",
+        "package test;",
+        "",
+        "import bullet.ObjectGraph;",
+        "import java.lang.Class;",
+        "import java.lang.IllegalArgumentException;",
+        "import java.lang.Override;",
+        "import javax.annotation.Generated;",
+        "",
+        "@Generated(\"bullet.impl.ComponentProcessor\")",
+        "public final class BulletSimpleComponent implements ObjectGraph {",
+        "  private final SimpleComponent component;",
+        "",
+        "  public BulletSimpleComponent(final SimpleComponent component) {",
+        "    this.component = component;",
+        "  }",
+        "",
+        "  @Override",
+        "  public <T> T get(final Class<T> type) {",
+        "    throw new IllegalArgumentException()",
+        "  }",
+        "",
+        "  @Override",
+        /*
+         * Note:
+         *  - C before A (as C extends A)
+         */
+        "  public <T> T inject(final T instance) {",
+        "    if (instance instanceof C) {",
+        "      this.component.inject((C) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof A) {",
+        "      this.component.inject((A) instance);",
+        "      return instance;",
+        "    }",
+        "    if (instance instanceof B) {",
+        "      this.component.inject((B) instance);",
+        "      return instance;",
+        "    }",
+        "    throw new IllegalArgumentException();",
+        "  }",
+        "}");
+    assert_().about(javaSources()).that(ImmutableList.of(dFile, aFile, bFile, cFile, componentFile))
+        .processedWith(new ComponentProcessor())
+        .compilesWithoutError()
+        .and().generatesSources(generatedBullet);
+  }
+
   @Test public void nonVisibleMethods() {
     JavaFileObject aFile = JavaFileObjects.forSourceLines("other.A",
         "package other;",
