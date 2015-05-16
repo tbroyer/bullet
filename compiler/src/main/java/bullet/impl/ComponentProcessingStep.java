@@ -92,7 +92,9 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
 
       @Override
       public int compare(TypeMirror o1, TypeMirror o2) {
-        if (typeUtils.isSubtype(o1, o2)) {
+        if (typeUtils.isSameType(o1, o2)) {
+          return 0;
+        } else if (typeUtils.isSubtype(o1, o2)) {
           return -1;
         } else if (typeUtils.isSubtype(o2, o1)) {
           return 1;
