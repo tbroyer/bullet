@@ -185,7 +185,7 @@ public abstract class AbstractComponentProcessorTest {
         "import javax.inject.Inject;",
         "",
         "final class A implements I {",
-        "  public void setE(E e) {};",
+        "  @Inject public void setE(E e) {};",
         "}");
     JavaFileObject bFile = JavaFileObjects.forSourceLines("test.B",
         "package test;",
@@ -210,8 +210,8 @@ public abstract class AbstractComponentProcessorTest {
         "import javax.inject.Inject;",
         "",
         "final class D implements I2 {",
-        "  public void setC(C c) {}",
-        "  public void setE(E e) {}",
+        "  @Inject public void setC(C c) {}",
+        "  @Inject public void setE(E e) {}",
         "}");
     JavaFileObject eFile = JavaFileObjects.forSourceLines("test.E",
         "package test;",
@@ -219,6 +219,7 @@ public abstract class AbstractComponentProcessorTest {
         "import javax.inject.Inject;",
         "",
         "final class E {",
+        " @Inject E() {}",
         "}");
     JavaFileObject componentFile = JavaFileObjects.forSourceLines("test.SimpleComponent",
         "package test;",
