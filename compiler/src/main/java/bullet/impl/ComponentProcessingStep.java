@@ -22,10 +22,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Set;
-import java.util.TreeMap;
 
 import javax.annotation.Generated;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -34,7 +31,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
 
@@ -87,7 +83,7 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
   private void generateObjectGraph(TypeElement element) {
     DeclaredType component = MoreTypes.asDeclared(element.asType());
     ArrayList<ComponentMethodDescriptor> provisionMethods = new ArrayList<>();
-    ArrayList<ComponentMethodDescriptor> membersInjectionMethods = new ArrayList<>();
+    MembersInjectionMethodsBuilder membersInjectionMethods = new MembersInjectionMethodsBuilder(processingEnv.getTypeUtils());
 
     PackageElement packageElement = processingEnv.getElementUtils().getPackageOf(element);
     TypeElement objectElement = processingEnv.getElementUtils().getTypeElement(Object.class.getCanonicalName());
@@ -120,28 +116,6 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
           throw new AssertionError();
       }
     }
-
-    // Order members-injection methods from most-specific to least-specific types, for cascading ifs of instanceof.
-    Collections.sort(membersInjectionMethods, new Comparator<ComponentMethodDescriptor>() {
-      final javax.lang.model.util.Types typeUtils = processingEnv.getTypeUtils();
-
-      @Override
-      public int compare(ComponentMethodDescriptor o1, ComponentMethodDescriptor o2) {
-        TypeMirror t1 = o1.type(), t2 = o2.type();
-        if (typeUtils.isSameType(t1, t2)) {
-          return 0;
-        } else if (typeUtils.isSubtype(t1, t2)) {
-          return -1;
-        } else if (typeUtils.isSubtype(t2, t1)) {
-          return 1;
-        }
-        return getName(t1).compareTo(getName(t2));
-      }
-
-      private String getName(TypeMirror type) {
-        return MoreElements.asType(typeUtils.asElement(type)).getQualifiedName().toString();
-      }
-    });
 
     final ClassName elementName = ClassName.get(element);
 
@@ -185,7 +159,7 @@ class ComponentProcessingStep implements BasicAnnotationProcessor.ProcessingStep
         .addTypeVariable(t)
         .returns(t)
         .addParameter(t, "instance", FINAL);
-    for (ComponentMethodDescriptor method : membersInjectionMethods) {
+    for (ComponentMethodDescriptor method : membersInjectionMethods.build()) {
       injectWriter.addCode(
           "if (instance instanceof $T) {\n$>" +
           "this.component.$N$L(($T) instance);\n" +
