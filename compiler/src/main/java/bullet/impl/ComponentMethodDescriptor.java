@@ -38,7 +38,7 @@ abstract class ComponentMethodDescriptor {
   }
 
   abstract ComponentMethodKind kind();
-  abstract TypeMirror type();
+  abstract DeclaredType type();
   abstract String name();
 
   @Override
@@ -100,12 +100,12 @@ abstract class ComponentMethodDescriptor {
           || MoreTypes.isTypeOf(Lazy.class, returnType)) {
         return methodDescriptor(
             ComponentMethodKind.PROVIDER_OR_LAZY,
-            MoreTypes.asDeclared(returnType).getTypeArguments().get(0),
+            MoreTypes.asDeclared(MoreTypes.asDeclared(returnType).getTypeArguments().get(0)),
             componentMethod);
       } else if (MoreTypes.isTypeOf(MembersInjector.class, returnType)) {
         return methodDescriptor(
             ComponentMethodKind.MEMBERS_INJECTOR,
-            MoreTypes.asDeclared(returnType).getTypeArguments().get(0),
+            MoreTypes.asDeclared(MoreTypes.asDeclared(returnType).getTypeArguments().get(0)),
             componentMethod);
       } else if (MoreElements.getAnnotationMirror(types.asElement(returnType), Subcomponent.class).isPresent()) {
         // Ignore subcomponent methods
@@ -117,7 +117,7 @@ abstract class ComponentMethodDescriptor {
         && resolvedComponentMethod.getReturnType().getKind() == TypeKind.DECLARED) {
       return methodDescriptor(
           ComponentMethodKind.SIMPLE_PROVISION,
-          returnType,
+          MoreTypes.asDeclared(returnType),
           componentMethod);
     }
 
@@ -128,7 +128,7 @@ abstract class ComponentMethodDescriptor {
             || types.isSameType(returnType, parameterTypes.get(0)))) {
       return methodDescriptor(
           ComponentMethodKind.SIMPLE_MEMBERS_INJECTION,
-          parameterTypes.get(0),
+          MoreTypes.asDeclared(parameterTypes.get(0)),
           componentMethod);
     }
 
@@ -137,7 +137,7 @@ abstract class ComponentMethodDescriptor {
   }
 
   private static Optional<ComponentMethodDescriptor> methodDescriptor(
-      ComponentMethodKind kind, TypeMirror type, ExecutableElement componentMethod) {
+      ComponentMethodKind kind, DeclaredType type, ExecutableElement componentMethod) {
     // ObjectGraph API doesn't allow passing qualifier as input, so ignore those methods.
     if (hasQualifier(componentMethod)) {
       return Optional.absent();

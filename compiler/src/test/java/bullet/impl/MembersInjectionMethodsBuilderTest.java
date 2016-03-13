@@ -50,17 +50,16 @@ public class MembersInjectionMethodsBuilderTest {
           }
         }
     });
-    // TODO: current implementation doesn't remove duplicates
-//    data.add(new Object[]{
-//        "single duplicate value",
-//        asList(A.class, A.class),
-//        new Asserter() {
-//          @Override
-//          public void check(List<Class<?>> sorted) {
-//            assertThat(sorted).containsExactly(A.class);
-//          }
-//        }
-//    });
+    data.add(new Object[]{
+        "single duplicate value",
+        asList(A.class, A.class),
+        new Asserter() {
+          @Override
+          public void check(List<Class<?>> sorted) {
+            assertThat(sorted).containsExactly(A.class);
+          }
+        }
+    });
 
     addPermutations(data, "unrelated types", asList(A.class, B.class, C.class), new Asserter() {
       @Override
@@ -103,17 +102,17 @@ public class MembersInjectionMethodsBuilderTest {
       }
     });
 
-    // Ignore: some of them are currently failing
-//    addPermutations(data, "shared hierarchy mixed with unrelated class",
-//        asList(I.class, I2.class, A.class, B.class, C.class, D.class),
-//        new Asserter() {
-//          @Override
-//          public void check(List<Class<?>> sorted) {
-//            assertThat(sorted).containsExactly(I.class, I2.class, A.class, B.class, C.class, D.class);
-//            assertThat(sorted).containsAllOf(A.class, I.class).inOrder();
-//            assertThat(sorted).containsAllOf(D.class, B.class, I2.class, I.class).inOrder();
-//          }
-//        });
+    addPermutations(data, "shared hierarchy mixed with unrelated class",
+        asList(I.class, I2.class, A.class, B.class, C.class, D.class),
+        new Asserter() {
+          @Override
+          public void check(List<Class<?>> sorted) {
+            assertThat(sorted).containsExactly(I.class, I2.class, A.class, B.class, C.class, D.class);
+            assertThat(sorted).containsAllOf(A.class, I.class).inOrder();
+            assertThat(sorted).containsAllOf(D.class, B.class, I2.class, I.class).inOrder();
+          }
+        });
+    // Ignore: generates 40K tests, taking (literally) minutes to run.
 //    addPermutations(data, "all test classes",
 //        asList(I.class, I2.class, A.class, B.class, C.class, D.class, E.class, F.class),
 //        new Asserter() {
