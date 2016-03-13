@@ -1,6 +1,7 @@
 package bullet.impl;
 
 import java.util.List;
+import java.util.Objects;
 
 import javax.inject.Provider;
 import javax.inject.Qualifier;
@@ -16,7 +17,12 @@ import com.google.auto.common.AnnotationMirrors;
 import com.google.auto.common.MoreElements;
 import com.google.auto.common.MoreTypes;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
+import com.squareup.javapoet.TypeName;
 
 import dagger.Lazy;
 import dagger.MembersInjector;
@@ -34,6 +40,56 @@ abstract class ComponentMethodDescriptor {
   abstract ComponentMethodKind kind();
   abstract TypeMirror type();
   abstract String name();
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (obj == null || obj.getClass() != this.getClass()) {
+      return false;
+    }
+    ComponentMethodDescriptor other = (ComponentMethodDescriptor) obj;
+    return Objects.equals(this.kind(), other.kind())
+        && MoreTypes.equivalence().equivalent(this.type(), other.type())
+        && Objects.equals(this.name(), other.name());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        this.kind(),
+        MoreTypes.equivalence().wrap(this.type()),
+        this.name());
+  }
+
+  @Override
+  public String toString() {
+    switch (this.kind()) {
+      case SIMPLE_PROVISION:
+        return MethodSpec.methodBuilder(this.name())
+            .returns(TypeName.get(this.type()))
+            .build()
+            .toString();
+      case PROVIDER_OR_LAZY:
+        return MethodSpec.methodBuilder(this.name())
+            .returns(ParameterizedTypeName.get(ClassName.get(Provider.class), TypeName.get(this.type())))
+            .build()
+            .toString();
+      case SIMPLE_MEMBERS_INJECTION:
+        return MethodSpec.methodBuilder(this.name())
+            .addParameter(TypeName.get(this.type()), "instance")
+            .build()
+            .toString();
+      case MEMBERS_INJECTOR:
+        return MethodSpec.methodBuilder(this.name())
+            .returns(ParameterizedTypeName.get(ClassName.get(MembersInjector.class), TypeName.get(this.type())))
+            .build()
+            .toString();
+      default:
+        return super.toString();
+    }
+  }
 
   static Optional<ComponentMethodDescriptor> forComponentMethod(Types types, DeclaredType componentElement, ExecutableElement componentMethod) {
     // Using same algorithm as Dagger's ComponentDescriptor#getDescriptorForComponentMethod
@@ -58,7 +114,7 @@ abstract class ComponentMethodDescriptor {
     }
 
     if (resolvedComponentMethod.getParameterTypes().isEmpty()
-        && resolvedComponentMethod.getReturnType().getKind() != TypeKind.VOID) {
+        && resolvedComponentMethod.getReturnType().getKind() == TypeKind.DECLARED) {
       return methodDescriptor(
           ComponentMethodKind.SIMPLE_PROVISION,
           returnType,
